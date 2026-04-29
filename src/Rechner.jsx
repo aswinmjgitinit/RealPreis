@@ -102,7 +102,7 @@ function Rechner({ onBack }) {
               <label>Dein Name</label>
               <input
                 type="text"
-                placeholder="z.B. Aswin MJ"
+                placeholder="z.B. Steve Harrington"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="rp-input"
@@ -114,7 +114,7 @@ function Rechner({ onBack }) {
               <label>Deine Tätigkeit</label>
               <input
                 type="text"
-                placeholder="z.B. Hausmeister FSJ / Ausbildung"
+                placeholder="z.B. Hausmeister / Pflege / FSJ / Ausbildung"
                 value={job}
                 onChange={e => setJob(e.target.value)}
                 className="rp-input"
