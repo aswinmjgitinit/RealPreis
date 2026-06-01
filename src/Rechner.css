@@ -409,6 +409,81 @@
   color: #a5a0ff;
 }
 
+/* ─── Wage Mode Toggle ───────────────────────────────────────────────────── */
+
+.wage-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.3rem;
+}
+
+.wage-mode-btn {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  letter-spacing: 0.01em;
+}
+
+.wage-mode-btn:hover {
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wage-mode-btn.active {
+  background: linear-gradient(135deg, #6c63ff 0%, #a855f7 100%);
+  color: white;
+  box-shadow: 0 4px 14px rgba(108, 99, 255, 0.4);
+}
+
+/* ─── Hours Per Day Pills ─────────────────────────────────────────────────── */
+
+.hours-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.hours-pill {
+  flex: 1;
+  min-width: 60px;
+  padding: 0.6rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.hours-pill:hover {
+  border-color: #6c63ff;
+  color: #a5a0ff;
+  background: rgba(108, 99, 255, 0.08);
+}
+
+.hours-pill.selected {
+  background: rgba(108, 99, 255, 0.2);
+  border-color: #6c63ff;
+  color: #a5a0ff;
+  box-shadow: 0 0 10px rgba(108, 99, 255, 0.3);
+}
+
 /* ─── Buttons ────────────────────────────────────────────────────────────── */
 
 .rp-next {

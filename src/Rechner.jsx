@@ -8,6 +8,8 @@ const CURRENCIES = [
   { code: 'CHF', symbol: '₣', label: 'Franken (CH)' },
 ];
 
+const HOURS_PER_DAY = [8, 9, 10, 11];
+
 function formatTime(minutes) {
   if (minutes < 1) {
     const secs = Math.round(minutes * 60);
@@ -22,21 +24,33 @@ function formatTime(minutes) {
   return { value: h, unit: h === 1 ? 'Stunde' : 'Stunden', extra: m > 0 ? `${m} Min.` : null, raw: minutes };
 }
 
+// Monatslohn + Std/Tag → Stundenlohn
+// Formula: monatslohn / (stunden_pro_tag * 5 * 52 / 12)
+function calcHourlyFromMonthly(monthly, hoursPerDay) {
+  const monthlyHours = (hoursPerDay * 5 * 52) / 12;
+  return monthly / monthlyHours;
+}
+
 function Rechner({ onBack }) {
-  // step 1=name/job, 2=stundenlohn, 3=produkt, 4=ergebnis
   const [step, setStep] = useState(1);
   const [animating, setAnimating] = useState(false);
 
-  // profile — persists across calculations
+  // profile
   const [name, setName] = useState('');
   const [job, setJob] = useState('');
-  const [hourlyWage, setHourlyWage] = useState('');
   const [currency, setCurrency] = useState(CURRENCIES[0]);
-
-  // whether profile is locked in (set after step 2 first time)
   const [profileLocked, setProfileLocked] = useState(false);
 
-  // per-calculation state
+  // wage mode: 'monthly' | 'hourly'
+  const [wageMode, setWageMode] = useState('monthly');
+  const [monthlyWage, setMonthlyWage] = useState('');
+  const [hoursPerDay, setHoursPerDay] = useState(null); // null = not selected
+  const [directHourly, setDirectHourly] = useState('');
+
+  // computed hourly (what the rest of the app uses)
+  const [hourlyWage, setHourlyWage] = useState('');
+
+  // per-calculation
   const [item, setItem] = useState('');
   const [price, setPrice] = useState('');
   const [result, setResult] = useState(null);
@@ -49,11 +63,22 @@ function Rechner({ onBack }) {
     }, 480);
   };
 
-  const handleStep1Next = () => {
-    goToStep(2);
-  };
+  // Live preview of computed hourly rate for monthly mode
+  const computedHourly = wageMode === 'monthly' && monthlyWage && hoursPerDay
+    ? calcHourlyFromMonthly(parseFloat(monthlyWage), hoursPerDay)
+    : wageMode === 'hourly' && directHourly
+    ? parseFloat(directHourly)
+    : null;
+
+  const step2Valid = wageMode === 'monthly'
+    ? (monthlyWage && parseFloat(monthlyWage) > 0 && hoursPerDay !== null)
+    : (directHourly && parseFloat(directHourly) > 0);
 
   const handleStep2Next = () => {
+    const h = wageMode === 'monthly'
+      ? calcHourlyFromMonthly(parseFloat(monthlyWage), hoursPerDay).toFixed(4)
+      : parseFloat(directHourly).toFixed(4);
+    setHourlyWage(h);
     setProfileLocked(true);
     goToStep(3);
   };
@@ -67,7 +92,6 @@ function Rechner({ onBack }) {
     goToStep(4);
   };
 
-  // After result: go back to step 3 (Produkt), keep name/job/wage
   const resetToProduct = () => {
     setItem('');
     setPrice('');
@@ -75,35 +99,37 @@ function Rechner({ onBack }) {
     goToStep(3);
   };
 
-  // Change wage: go back to step 2, keep name/job
   const changeWage = () => {
     goToStep(2);
   };
 
-  // Full reset (only on page refresh naturally, but exposed via a hidden path)
-  // We don't expose a full-reset button — page refresh does it.
-
-  const selectedCurrency = currency;
-
-  // Step dots: only show 3 dots for steps 1-3, hide on result
   const showDots = step <= 3;
+
+  // display wage in persona pill — show monthly if monthly mode, else hourly
+  const personaWageDisplay = wageMode === 'monthly' && monthlyWage
+    ? `${currency.symbol}${parseFloat(monthlyWage).toFixed(0)}/Mo.`
+    : `${currency.symbol}${parseFloat(hourlyWage).toFixed(2)}/Std.`;
 
   return (
     <div className="rechner-root">
       <nav className="navbar">
         <div className="nav-container">
-          <button className="back-button" onClick={onBack}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 2L4 7L9 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Startseite
-          </button>
+          <div className="nav-left">
+            <button className="back-button" onClick={onBack}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M9 2L4 7L9 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Startseite
+            </button>
+          </div>
           <div className="nav-brand">RealPreis</div>
-          <ul className="nav-menu">
-            <li><a href="#features">Wie es Funktioniert</a></li>
-            <li><a href="#pricing">Im Deutschland</a></li>
-            <li><a href="#contact">Unterstützung</a></li>
-          </ul>
+          <div className="nav-right">
+            <ul className="nav-menu">
+              <li><a href="#features">Wie es Funktioniert</a></li>
+              <li><a href="#pricing">Im Deutschland</a></li>
+              <li><a href="#contact">Unterstützung</a></li>
+            </ul>
+          </div>
         </div>
       </nav>
 
@@ -112,7 +138,6 @@ function Rechner({ onBack }) {
         <div className="blob blob-2" />
         <div className="blob blob-3" />
 
-        {/* Step dots */}
         {showDots && (
           <div className={`step-indicator ${animating ? 'fade-out' : 'fade-in'}`}>
             {[1, 2, 3].map(s => (
@@ -132,7 +157,7 @@ function Rechner({ onBack }) {
               <label>Dein Name</label>
               <input
                 type="text"
-                placeholder="z.B. Steve Harrington"
+                placeholder="z.B. Aswin MJ"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="rp-input"
@@ -144,7 +169,7 @@ function Rechner({ onBack }) {
               <label>Deine Tätigkeit</label>
               <input
                 type="text"
-                placeholder="z.B. Hausmeister / Pflege / FSJ / Ausbildung"
+                placeholder="z.B. FSJ / Ausbildung / Arbeit"
                 value={job}
                 onChange={e => setJob(e.target.value)}
                 className="rp-input"
@@ -154,14 +179,14 @@ function Rechner({ onBack }) {
             <button
               className="rp-next"
               disabled={!name.trim() || !job.trim()}
-              onClick={handleStep1Next}
+              onClick={() => goToStep(2)}
             >
               Weiter →
             </button>
           </div>
         )}
 
-        {/* ── STEP 2 — Stundenlohn ── */}
+        {/* ── STEP 2 — Lohn ── */}
         {step === 2 && (
           <div className={`card-panel ${animating ? 'slide-out' : 'slide-in'}`}>
             <div className="card-eyebrow">Schritt 2 von 3</div>
@@ -170,52 +195,109 @@ function Rechner({ onBack }) {
               <span className="persona-dot">·</span>
               <span className="persona-job">{job}</span>
             </div>
-            <h2 className="card-title">Dein Stundenlohn</h2>
-            <p className="card-sub">Was verdienst du pro Stunde (netto)?</p>
+            <h2 className="card-title">Dein Lohn</h2>
+            <p className="card-sub">Wie wirst du bezahlt?</p>
 
-            <div className="wage-row">
-              <div className="currency-select-wrap">
-                <label>Währung</label>
-                <div className="currency-pills">
-                  {CURRENCIES.map(c => (
-                    <button
-                      key={c.code}
-                      className={`currency-pill ${currency.code === c.code ? 'selected' : ''}`}
-                      onClick={() => setCurrency(c)}
-                    >
-                      {c.symbol} {c.code}
-                    </button>
-                  ))}
-                </div>
+            {/* Mode toggle */}
+            <div className="wage-mode-toggle">
+              <button
+                className={`wage-mode-btn ${wageMode === 'monthly' ? 'active' : ''}`}
+                onClick={() => setWageMode('monthly')}
+              >
+                💶 Monatslohn
+              </button>
+              <button
+                className={`wage-mode-btn ${wageMode === 'hourly' ? 'active' : ''}`}
+                onClick={() => setWageMode('hourly')}
+              >
+                ⏱ Stundenlohn
+              </button>
+            </div>
+
+            {/* Currency */}
+            <div className="input-group" style={{ marginTop: '1.4rem' }}>
+              <label>Währung</label>
+              <div className="currency-pills">
+                {CURRENCIES.map(c => (
+                  <button
+                    key={c.code}
+                    className={`currency-pill ${currency.code === c.code ? 'selected' : ''}`}
+                    onClick={() => setCurrency(c)}
+                  >
+                    {c.symbol} {c.code}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              <div className="input-group wage-input-group">
+            {/* Monthly mode */}
+            {wageMode === 'monthly' && (
+              <>
+                <div className="input-group">
+                  <label>Betrag pro Monat</label>
+                  <div className="wage-input-wrap">
+                    <span className="currency-badge">{currency.symbol}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="10"
+                      placeholder="620"
+                      value={monthlyWage}
+                      onChange={e => setMonthlyWage(e.target.value)}
+                      className="rp-input wage-num"
+                    />
+                    <span className="per-hour-label">/ Mo.</span>
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>Stunden pro Tag</label>
+                  <div className="hours-pills">
+                    {HOURS_PER_DAY.map(h => (
+                      <button
+                        key={h}
+                        className={`hours-pill ${hoursPerDay === h ? 'selected' : ''}`}
+                        onClick={() => setHoursPerDay(h)}
+                      >
+                        {h} Std.
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Hourly mode */}
+            {wageMode === 'hourly' && (
+              <div className="input-group">
                 <label>Betrag pro Stunde</label>
                 <div className="wage-input-wrap">
-                  <span className="currency-badge">{selectedCurrency.symbol}</span>
+                  <span className="currency-badge">{currency.symbol}</span>
                   <input
                     type="number"
                     min="0"
                     step="0.5"
                     placeholder="13,00"
-                    value={hourlyWage}
-                    onChange={e => setHourlyWage(e.target.value)}
+                    value={directHourly}
+                    onChange={e => setDirectHourly(e.target.value)}
                     className="rp-input wage-num"
                   />
                   <span className="per-hour-label">/ Std.</span>
                 </div>
               </div>
-            </div>
+            )}
 
-            {hourlyWage && (
+            {/* Live preview */}
+            {computedHourly !== null && computedHourly > 0 && (
               <div className="wage-preview">
-                💡 Du verdienst <strong>{selectedCurrency.symbol}{(parseFloat(hourlyWage) / 60).toFixed(2)}</strong> pro Minute.
+                💡 Das sind <strong>{currency.symbol}{computedHourly.toFixed(2)}</strong> pro Stunde
+                {' '}→ <strong>{currency.symbol}{(computedHourly / 60).toFixed(2)}</strong> pro Minute.
               </div>
             )}
 
             <button
               className="rp-next"
-              disabled={!hourlyWage || parseFloat(hourlyWage) <= 0}
+              disabled={!step2Valid}
               onClick={handleStep2Next}
             >
               Weiter →
@@ -234,7 +316,7 @@ function Rechner({ onBack }) {
               <span className="persona-dot">·</span>
               <span className="persona-job">{job}</span>
               <span className="persona-dot">·</span>
-              <span className="persona-wage">{selectedCurrency.symbol}{hourlyWage}/Std.</span>
+              <span className="persona-wage">{personaWageDisplay}</span>
             </div>
             <h2 className="card-title">Was willst du kaufen?</h2>
             <p className="card-sub">Gib den Artikel und seinen Preis ein.</p>
@@ -262,9 +344,9 @@ function Rechner({ onBack }) {
             </div>
 
             <div className="input-group">
-              <label>Preis ({selectedCurrency.code})</label>
+              <label>Preis ({currency.code})</label>
               <div className="wage-input-wrap">
-                <span className="currency-badge">{selectedCurrency.symbol}</span>
+                <span className="currency-badge">{currency.symbol}</span>
                 <input
                   type="number"
                   min="0"
@@ -285,7 +367,6 @@ function Rechner({ onBack }) {
               Zeig mir, was ich ausgebe ✦
             </button>
 
-            {/* Only show "Stundenlohn ändern" after first lock-in */}
             {profileLocked && (
               <button className="rp-next rp-ghost" onClick={changeWage}>
                 Stundenlohn ändern
@@ -298,13 +379,11 @@ function Rechner({ onBack }) {
         {step === 4 && result && (
           <div className={`card-panel result-panel ${animating ? 'slide-out' : 'slide-in'}`}>
             <div className="result-eyebrow">Dein RealPreis</div>
-            <div className="result-persona">
-              {name} · {job}
-            </div>
+            <div className="result-persona">{name} · {job}</div>
 
             <div className="result-item-label">
               <span className="result-item-name">„{item}"</span>
-              <span className="result-price-tag">{selectedCurrency.symbol}{parseFloat(price).toFixed(2)}</span>
+              <span className="result-price-tag">{currency.symbol}{parseFloat(price).toFixed(2)}</span>
             </div>
 
             <div className="result-equals">kostet dich wirklich</div>
