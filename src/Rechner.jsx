@@ -3,7 +3,6 @@ import './Rechner.css';
 
 const CURRENCIES = [
   { code: 'EUR', symbol: '€', label: 'Euro (DE)' },
-  { code: 'INR', symbol: '₹', label: 'Rupie (IN)' },
   { code: 'USD', symbol: '$', label: 'Dollar (US)' },
   { code: 'GBP', symbol: '£', label: 'Pfund (UK)' },
   { code: 'CHF', symbol: '₣', label: 'Franken (CH)' },
@@ -24,13 +23,20 @@ function formatTime(minutes) {
 }
 
 function Rechner({ onBack }) {
+  // step 1=name/job, 2=stundenlohn, 3=produkt, 4=ergebnis
   const [step, setStep] = useState(1);
   const [animating, setAnimating] = useState(false);
 
+  // profile — persists across calculations
   const [name, setName] = useState('');
   const [job, setJob] = useState('');
   const [hourlyWage, setHourlyWage] = useState('');
   const [currency, setCurrency] = useState(CURRENCIES[0]);
+
+  // whether profile is locked in (set after step 2 first time)
+  const [profileLocked, setProfileLocked] = useState(false);
+
+  // per-calculation state
   const [item, setItem] = useState('');
   const [price, setPrice] = useState('');
   const [result, setResult] = useState(null);
@@ -43,6 +49,15 @@ function Rechner({ onBack }) {
     }, 480);
   };
 
+  const handleStep1Next = () => {
+    goToStep(2);
+  };
+
+  const handleStep2Next = () => {
+    setProfileLocked(true);
+    goToStep(3);
+  };
+
   const handleCalculate = () => {
     const wage = parseFloat(hourlyWage);
     const cost = parseFloat(price);
@@ -52,23 +67,37 @@ function Rechner({ onBack }) {
     goToStep(4);
   };
 
-  const reset = () => {
-    setName('');
-    setJob('');
-    setHourlyWage('');
+  // After result: go back to step 3 (Produkt), keep name/job/wage
+  const resetToProduct = () => {
     setItem('');
     setPrice('');
     setResult(null);
-    goToStep(1);
+    goToStep(3);
   };
 
+  // Change wage: go back to step 2, keep name/job
+  const changeWage = () => {
+    goToStep(2);
+  };
+
+  // Full reset (only on page refresh naturally, but exposed via a hidden path)
+  // We don't expose a full-reset button — page refresh does it.
+
   const selectedCurrency = currency;
+
+  // Step dots: only show 3 dots for steps 1-3, hide on result
+  const showDots = step <= 3;
 
   return (
     <div className="rechner-root">
       <nav className="navbar">
         <div className="nav-container">
-          <button className="back-button" onClick={onBack}>← Startseite</button>
+          <button className="back-button" onClick={onBack}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 2L4 7L9 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Startseite
+          </button>
           <div className="nav-brand">RealPreis</div>
           <ul className="nav-menu">
             <li><a href="#features">Wie es Funktioniert</a></li>
@@ -79,19 +108,20 @@ function Rechner({ onBack }) {
       </nav>
 
       <div className="rechner-stage">
-        {/* Floating ambient blobs */}
         <div className="blob blob-1" />
         <div className="blob blob-2" />
         <div className="blob blob-3" />
 
-        {/* Step progress */}
-        <div className={`step-indicator ${animating ? 'fade-out' : 'fade-in'}`}>
-          {[1, 2, 3].map(s => (
-            <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step === s ? 'current' : ''}`} />
-          ))}
-        </div>
+        {/* Step dots */}
+        {showDots && (
+          <div className={`step-indicator ${animating ? 'fade-out' : 'fade-in'}`}>
+            {[1, 2, 3].map(s => (
+              <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step === s ? 'current' : ''}`} />
+            ))}
+          </div>
+        )}
 
-        {/* STEP 1 — Name & Job */}
+        {/* ── STEP 1 — Name & Job ── */}
         {step === 1 && (
           <div className={`card-panel ${animating ? 'slide-out' : 'slide-in'}`}>
             <div className="card-eyebrow">Schritt 1 von 3</div>
@@ -124,14 +154,14 @@ function Rechner({ onBack }) {
             <button
               className="rp-next"
               disabled={!name.trim() || !job.trim()}
-              onClick={() => goToStep(2)}
+              onClick={handleStep1Next}
             >
               Weiter →
             </button>
           </div>
         )}
 
-        {/* STEP 2 — Stundenlohn */}
+        {/* ── STEP 2 — Stundenlohn ── */}
         {step === 2 && (
           <div className={`card-panel ${animating ? 'slide-out' : 'slide-in'}`}>
             <div className="card-eyebrow">Schritt 2 von 3</div>
@@ -186,17 +216,19 @@ function Rechner({ onBack }) {
             <button
               className="rp-next"
               disabled={!hourlyWage || parseFloat(hourlyWage) <= 0}
-              onClick={() => goToStep(3)}
+              onClick={handleStep2Next}
             >
               Weiter →
             </button>
           </div>
         )}
 
-        {/* STEP 3 — Was kaufst du? */}
+        {/* ── STEP 3 — Was kaufst du? ── */}
         {step === 3 && (
           <div className={`card-panel ${animating ? 'slide-out' : 'slide-in'}`}>
-            <div className="card-eyebrow">Schritt 3 von 3</div>
+            <div className="card-eyebrow">
+              {profileLocked ? 'Neue Berechnung' : 'Schritt 3 von 3'}
+            </div>
             <div className="card-persona">
               <span className="persona-name">{name}</span>
               <span className="persona-dot">·</span>
@@ -252,10 +284,17 @@ function Rechner({ onBack }) {
             >
               Zeig mir, was ich ausgebe ✦
             </button>
+
+            {/* Only show "Stundenlohn ändern" after first lock-in */}
+            {profileLocked && (
+              <button className="rp-next rp-ghost" onClick={changeWage}>
+                Stundenlohn ändern
+              </button>
+            )}
           </div>
         )}
 
-        {/* STEP 4 — Ergebnis */}
+        {/* ── STEP 4 — Ergebnis ── */}
         {step === 4 && result && (
           <div className={`card-panel result-panel ${animating ? 'slide-out' : 'slide-in'}`}>
             <div className="result-eyebrow">Dein RealPreis</div>
@@ -302,7 +341,7 @@ function Rechner({ onBack }) {
             </div>
 
             <div className="result-actions">
-              <button className="rp-next rp-reset" onClick={reset}>
+              <button className="rp-next rp-reset" onClick={resetToProduct}>
                 Neues Produkt berechnen
               </button>
             </div>
